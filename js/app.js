@@ -11,6 +11,7 @@ import {
     ensurePageRule,
     measurePageFit,
     textLength,
+    readableText,
     printHtml,
     buildLetterHtml,
     escapeHtml,
@@ -613,6 +614,13 @@ function renderReview(result) {
                     ? 'Volume de texto acima do original'
                     : 'Volume de texto preservado',
         },
+        {
+            ok: result.atsCheck?.ok !== false,
+            text:
+                result.atsCheck?.ok === false
+                    ? 'Palavras-chave fora do texto extraível'
+                    : 'Palavras-chave visíveis no texto',
+        },
         { ok: true, text: 'Sem scripts ou conteúdo executável' },
         ...(result.selfReview || []).map((text) => ({ ok: true, text })),
     ];
@@ -774,6 +782,15 @@ async function processDone(raw) {
         result: resultLength,
         ok: resultLength <= baseLength * 1.12 + 80,
     };
+    const readable = readableText(withPageRule);
+    const missingInText = analysis.keywordsCovered.filter(
+        (keyword) => !readable.toLowerCase().includes(keyword.toLowerCase())
+    );
+    const keywordTotal = Math.max(1, analysis.keywordsCovered.length);
+    const atsCheck = {
+        ok: readable.length > 300 && missingInText.length / keywordTotal <= 0.4,
+        missing: missingInText,
+    };
 
     state.printHtml = withPageRule;
     state.fit = fit;
@@ -785,6 +802,7 @@ async function processDone(raw) {
         selfReview,
         fit,
         lengthCheck,
+        atsCheck,
         designPreserved: true,
         contactCheck,
         html: withPageRule,
@@ -976,6 +994,7 @@ async function runDemo({ scroll = true } = {}) {
         selfReview: demo.selfReview,
         fit,
         lengthCheck: { ok: true },
+        atsCheck: { ok: true },
         designPreserved: true,
         contactCheck: { missing: [] },
         html: demo.html,

@@ -176,6 +176,10 @@ export function textLength(html) {
     return visibleText(html).replace(/\s+/g, ' ').length;
 }
 
+export function readableText(html) {
+    return visibleText(html);
+}
+
 export function reviewContacts(baseHtml, resultHtml) {
     const base = extractContactValues(baseHtml);
     const resultDoc = new DOMParser().parseFromString(resultHtml, 'text/html');
