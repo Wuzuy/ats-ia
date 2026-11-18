@@ -1,15 +1,22 @@
 /* ATS.IA — orquestração da interface. */
 
 import {
-    normalizeResult,
-    buildResumeHtml,
-    createDemoResult,
-    extractIdentity,
-    mergeIdentity,
-    slugify,
-} from './resume.js';
+    prepareBaseHtml,
+    restoreAssets,
+    extractBodyHtml,
+    injectBodyHtml,
+    validateDesign,
+    reviewContacts,
+    extractContactValues,
+    ensurePageRule,
+    measurePageFit,
+    textLength,
+    printHtml,
+    buildLetterHtml,
+    escapeHtml,
+} from './html.js';
 import { generateWithAI, testProvider, providerLabel } from './ai.js';
-import { generatePdf } from './pdf.js';
+import { createDemo } from './demo.js';
 
 const SETTINGS_KEY = 'atsia.settings.v1';
 const BASE_KEY = 'atsia.base.v1';
@@ -26,9 +33,12 @@ const DEFAULT_SETTINGS = {
 const state = {
     settings: loadSettings(),
     base: loadBase(),
+    prepared: null,
+    questions: [],
     result: null,
-    pdf: null,
-    pdfBusy: false,
+    identity: { name: '', values: [] },
+    printHtml: '',
+    fit: { pages: 1, clipped: false, overflowing: false },
     busy: false,
 };
 
@@ -75,7 +85,7 @@ function saveBase() {
         localStorage.setItem(
             BASE_KEY,
             JSON.stringify({
-                html: state.base.html.slice(0, 120000),
+                html: state.base.html,
                 htmlName: state.base.htmlName,
                 pdfText: state.base.pdfText.slice(0, 30000),
                 pdfName: state.base.pdfName,
@@ -95,7 +105,7 @@ function showToast(message, type = '') {
     clearTimeout(toastTimer);
     toastTimer = window.setTimeout(() => {
         toast.className = 'toast';
-    }, 6500);
+    }, 7000);
 }
 
 function formatBytes(bytes) {
@@ -104,13 +114,19 @@ function formatBytes(bytes) {
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function slugify(value = '') {
+    return String(value)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 48);
+}
+
 function providerReady(settings = state.settings) {
     if (settings.provider === 'gemini') return Boolean(settings.geminiKey);
     return Boolean(settings.openaiBase && settings.openaiModel);
-}
-
-function scrollToApp() {
-    $('#app').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 /* ---------- Configuração da IA ---------- */
@@ -159,7 +175,7 @@ function readSettingsForm() {
     return {
         provider: $('#settings-dialog').dataset.provider || 'gemini',
         geminiKey: $('#gemini-key').value.trim(),
-        geminiModel: $('#gemini-model').value,
+        geminiModel: $('#gemini-model').value.trim(),
         openaiBase: $('#openai-base').value.trim(),
         openaiKey: $('#openai-key').value.trim(),
         openaiModel: $('#openai-model').value.trim(),
@@ -229,6 +245,17 @@ async function extractPdfText(file) {
     return { text: parts.join('\n\n').slice(0, 30000), pages: doc.numPages };
 }
 
+function loadBaseHtml(raw) {
+    const prepared = prepareBaseHtml(raw);
+    const sanitized = restoreAssets(prepared.html, prepared.assets);
+    state.base.html = sanitized;
+    state.base.htmlName = state.base.htmlName || 'curriculo.html';
+    state.result = null;
+    state.questions = [];
+    saveBase();
+    renderFiles();
+}
+
 async function handleFiles(fileList) {
     const files = [...fileList];
     if (!files.length) return;
@@ -241,11 +268,9 @@ async function handleFiles(fileList) {
                 showToast('Esse arquivo não parece ser um currículo HTML válido.', 'error');
                 continue;
             }
-            state.base.html = text;
             state.base.htmlName = file.name;
-            saveBase();
-            renderFiles();
-            showToast('HTML carregado. Ele será a fonte da verdade.');
+            loadBaseHtml(text);
+            showToast('HTML carregado. O design será preservado.');
         } else if (lower.endsWith('.pdf')) {
             state.base.pdfName = file.name;
             state.base.pdfText = '';
@@ -283,6 +308,7 @@ function renderFiles(pdfStatus = '') {
         $('.file-remove', item).addEventListener('click', () => {
             state.base.html = '';
             state.base.htmlName = '';
+            state.result = null;
             saveBase();
             renderFiles();
         });
@@ -319,13 +345,11 @@ function applyPastedHtml() {
         showToast('O texto colado não parece um HTML de currículo.', 'error');
         return;
     }
-    state.base.html = html;
     state.base.htmlName = 'HTML colado';
-    saveBase();
-    renderFiles();
+    loadBaseHtml(html);
     $('#html-paste').value = '';
     $('.manual').removeAttribute('open');
-    showToast('HTML aplicado como base do currículo.');
+    showToast('HTML aplicado como base. O design será preservado.');
 }
 
 /* ---------- Busca da vaga ---------- */
@@ -364,7 +388,7 @@ async function fetchJobContent(url) {
             .trim();
         if (cleaned.length >= 220) return cleaned;
     } catch {
-        /* tenta o próximo proxy */
+        /* cai para o próximo proxy */
     }
 
     const html = await fetchWithTimeout(
@@ -393,7 +417,6 @@ async function handleFetchJob() {
 
     try {
         const text = await fetchJobContent(url);
-
         $('#job-text').value = text.slice(0, 22000);
         updateJobCount();
         status.className = 'ok';
@@ -412,11 +435,9 @@ function updateJobCount() {
     $('#job-count').textContent = `${length.toLocaleString('pt-BR')} caracteres`;
 }
 
-/* ---------- Resultado ---------- */
+/* ---------- Estados do resultado ---------- */
 
 const loadingTimers = [];
-let loadingStepIndex = 0;
-
 function clearLoadingTimers() {
     loadingTimers.forEach((timer) => window.clearTimeout(timer));
     loadingTimers.length = 0;
@@ -424,6 +445,7 @@ function clearLoadingTimers() {
 
 function setLoading(message, sub) {
     $('#result-empty').classList.add('hidden');
+    $('#result-questions').classList.add('hidden');
     $('#result-content').classList.add('hidden');
     $('#result-loading').classList.remove('hidden');
     if (message) $('#loading-title').textContent = message;
@@ -431,7 +453,6 @@ function setLoading(message, sub) {
 }
 
 function setLoadingStep(index, title, sub) {
-    loadingStepIndex = index;
     $$('#loading-steps .loading-step').forEach((step, i) => {
         step.classList.toggle('active', i === index);
         step.classList.toggle('done', i < index);
@@ -440,15 +461,188 @@ function setLoadingStep(index, title, sub) {
     if (sub) $('#loading-sub').textContent = sub;
 }
 
-function showEmptyState() {
+function showEmptyState(message) {
     $('#result-loading').classList.add('hidden');
+    $('#result-questions').classList.add('hidden');
     $('#result-content').classList.add('hidden');
     $('#result-empty').classList.remove('hidden');
+
+    if (message) {
+        $('#result-empty h3').textContent = 'Não foi possível gerar';
+        $('#result-empty p').textContent =
+            message.length > 240 ? `${message.slice(0, 240)}...` : message;
+    }
+}
+
+/* ---------- Perguntas de clarificação ---------- */
+
+function normalizeQuestions(raw) {
+    return (Array.isArray(raw) ? raw : [])
+        .map((question, index) => ({
+            id: String(question?.id || `q${index + 1}`),
+            question: String(question?.question || '').trim(),
+            why: String(question?.why || '').trim(),
+            type: question?.type === 'choice' ? 'choice' : 'text',
+            options: Array.isArray(question?.options)
+                ? question.options.map((option) => String(option).trim()).filter(Boolean).slice(0, 4)
+                : [],
+        }))
+        .filter((question) => question.question)
+        .slice(0, 4);
+}
+
+function renderQuestions(questions) {
+    state.questions = questions;
+    const list = $('#questions-list');
+    list.innerHTML = '';
+
+    questions.forEach((question, index) => {
+        const block = document.createElement('div');
+        block.className = 'question-item';
+
+        const label = document.createElement('label');
+        label.className = 'question-label';
+        label.htmlFor = `q-${index}`;
+        label.textContent = question.question;
+        block.appendChild(label);
+
+        if (question.why) {
+            const why = document.createElement('p');
+            why.className = 'question-why';
+            why.textContent = question.why;
+            block.appendChild(why);
+        }
+
+        if (question.type === 'choice' && question.options.length) {
+            const select = document.createElement('select');
+            select.id = `q-${index}`;
+            select.dataset.qid = question.id;
+            select.innerHTML = `<option value="">Selecione...</option>${question.options
+                .map((option) => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`)
+                .join('')}<option value="__other__">Outra resposta</option>`;
+            block.appendChild(select);
+
+            const other = document.createElement('input');
+            other.type = 'text';
+            other.id = `q-other-${index}`;
+            other.className = 'question-other hidden';
+            other.placeholder = 'Digite sua resposta';
+            other.dataset.qid = question.id;
+            block.appendChild(other);
+
+            select.addEventListener('change', () => {
+                other.classList.toggle('hidden', select.value !== '__other__');
+                if (select.value === '__other__') other.focus();
+            });
+        } else {
+            const input = document.createElement('textarea');
+            input.id = `q-${index}`;
+            input.rows = 2;
+            input.dataset.qid = question.id;
+            input.placeholder = 'Sua resposta';
+            block.appendChild(input);
+        }
+
+        list.appendChild(block);
+    });
+
+    $('#result-empty').classList.add('hidden');
+    $('#result-loading').classList.add('hidden');
+    $('#result-content').classList.add('hidden');
+    $('#result-questions').classList.remove('hidden');
+    $('#questions-title').textContent = `${questions.length} ponto${questions.length > 1 ? 's' : ''} para confirmar`;
+    $('#result-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function collectAnswers() {
+    const answers = {};
+    state.questions.forEach((question, index) => {
+        const select = document.getElementById(`q-${index}`);
+        let value = '';
+        if (select?.tagName === 'SELECT') {
+            value = select.value;
+            if (value === '__other__') value = document.getElementById(`q-other-${index}`)?.value || '';
+        } else if (select) {
+            value = select.value;
+        }
+        if (String(value || '').trim()) answers[question.question] = String(value).trim();
+    });
+    return answers;
+}
+
+function handleQuestionsSubmit(skip = false) {
+    const answers = skip ? {} : collectAnswers();
+    $('#result-questions').classList.add('hidden');
+    handleGenerate({ answers, force: true });
+}
+
+/* ---------- Resultado ---------- */
+
+function renderChips(container, values, emptyLabel, className = '') {
+    container.innerHTML = '';
+    if (!values.length) {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.textContent = emptyLabel;
+        container.appendChild(chip);
+        return;
+    }
+    values.forEach((value) => {
+        const chip = document.createElement('span');
+        chip.className = `chip ${className}`.trim();
+        chip.textContent = value;
+        container.appendChild(chip);
+    });
+}
+
+function renderReview(result) {
+    const list = $('#review-list');
+    list.innerHTML = '';
+    const contactsMissing = result.contactCheck?.missing?.length || 0;
+    const identityOk = contactsMissing === 0 && !result.contactCheck?.nameMissing;
+    const onePage = result.fit.pages <= 1 && !result.fit.clipped && !result.fit.overflowing;
+
+    const checks = [
+        { ok: result.designPreserved, text: 'Design original preservado' },
+        { ok: identityOk, text: identityOk ? 'Contatos e nome preservados' : 'Contatos ou nome precisam de revisão' },
+        { ok: onePage, text: onePage ? 'Conteúdo em uma página A4' : `Conteúdo em ${result.fit.pages} página(s)` },
+        {
+            ok: result.lengthCheck?.ok !== false,
+            text:
+                result.lengthCheck?.ok === false
+                    ? 'Volume de texto acima do original'
+                    : 'Volume de texto preservado',
+        },
+        { ok: true, text: 'Sem scripts ou conteúdo executável' },
+        ...(result.selfReview || []).map((text) => ({ ok: true, text })),
+    ];
+
+    checks.forEach((check) => {
+        const item = document.createElement('li');
+        item.className = `review-item ${check.ok ? 'ok' : 'warn'}`;
+        item.innerHTML = `<span class="review-icon" aria-hidden="true">${check.ok ? '✓' : '!'}</span><span></span>`;
+        item.lastElementChild.textContent = check.text;
+        list.appendChild(item);
+    });
+}
+
+function renderLetter(result) {
+    const identity = state.identity || { name: '', values: [] };
+    $('#letter-head').textContent = identity.name || '';
+    $('#letter-contact').textContent = identity.values.join(' · ');
+    $('#letter-date').textContent = new Date().toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+    });
+    $('#letter-body').textContent = result.coverLetter || 'A IA não retornou uma carta. Gere novamente.';
+    $('#letter-empty').classList.toggle('hidden', Boolean(result.coverLetter));
 }
 
 function renderResult(result) {
     state.result = result;
-    const { analysis, resume } = result;
+    const { analysis } = result;
+    const onePage = result.fit.pages <= 1 && !result.fit.clipped && !result.fit.overflowing;
 
     $('#score-ring').style.setProperty('--p', analysis.score);
     $('#score-value').textContent = analysis.score;
@@ -456,33 +650,25 @@ function renderResult(result) {
     $('#result-company').textContent = analysis.company;
     $('#badge-keywords').textContent = `${analysis.keywordsCovered.length} palavras-chave`;
     $('#badge-warn').classList.toggle('hidden', analysis.gaps.length === 0);
-    $('#badge-pages').textContent = 'PDF · preparando...';
-    $('#download-pdf').disabled = true;
+    $('#badge-pages').textContent = onePage ? 'PDF · 1 página' : `PDF · ${result.fit.pages} páginas`;
+    $('#badge-pages').classList.toggle('badge-good', onePage);
+    $('#badge-pages').classList.toggle('badge-warn', !onePage);
+    $('#badge-design').classList.toggle('badge-good', result.designPreserved);
+    $('#badge-design').classList.toggle('badge-warn', !result.designPreserved);
+    $('#badge-design').textContent = result.designPreserved ? 'Design preservado' : 'Design alterado';
 
-    const covered = $('#keywords-covered');
-    covered.innerHTML = '';
-    if (analysis.keywordsCovered.length) {
-        analysis.keywordsCovered.forEach((keyword) => {
-            const chip = document.createElement('span');
-            chip.className = 'chip ok';
-            chip.textContent = keyword;
-            covered.appendChild(chip);
-        });
+    const scaleNote = $('#print-scale-note');
+    if (onePage) {
+        scaleNote.classList.add('hidden');
+        scaleNote.textContent = '';
     } else {
-        const chip = document.createElement('span');
-        chip.className = 'chip';
-        chip.textContent = 'Nenhuma palavra-chave identificada';
-        covered.appendChild(chip);
+        scaleNote.classList.remove('hidden');
+        scaleNote.textContent =
+            'O conteúdo passou de uma página. Encurte o texto ou ajuste a escala no diálogo de impressão.';
     }
 
-    const missing = $('#keywords-missing');
-    missing.innerHTML = '';
-    analysis.keywordsMissing.forEach((keyword) => {
-        const chip = document.createElement('span');
-        chip.className = 'chip miss';
-        chip.textContent = keyword;
-        missing.appendChild(chip);
-    });
+    renderChips($('#keywords-covered'), analysis.keywordsCovered, 'Nenhuma palavra-chave identificada', 'ok');
+    renderChips($('#keywords-missing'), analysis.keywordsMissing, 'Nenhuma lacuna crítica', 'miss');
     $('#no-gaps-note').classList.toggle('hidden', analysis.keywordsMissing.length > 0);
 
     const changes = $('#changes-list');
@@ -493,16 +679,24 @@ function renderResult(result) {
         changes.appendChild(item);
     });
 
+    renderReview(result);
+    renderLetter(result);
+
     const frame = $('#preview-frame');
-    frame.srcdoc = buildResumeHtml(resume);
+    frame.srcdoc = state.printHtml;
     frame.onload = fitPreview;
 
     $('#result-empty').classList.add('hidden');
     $('#result-loading').classList.add('hidden');
+    $('#result-questions').classList.add('hidden');
     $('#result-content').classList.remove('hidden');
     switchTab('preview');
     fitPreview();
-    $('#result-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    $('#result-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    if (result.contactCheck?.missing?.length || result.contactCheck?.nameMissing) {
+        showToast('Atenção: confira o nome e os contatos no currículo final.', 'error');
+    }
 }
 
 function fitPreview() {
@@ -521,34 +715,90 @@ function switchTab(name) {
         tab.setAttribute('aria-selected', String(active));
     });
     $('#tab-preview').classList.toggle('hidden', name !== 'preview');
+    $('#tab-letter').classList.toggle('hidden', name !== 'letter');
     $('#tab-analysis').classList.toggle('hidden', name !== 'analysis');
     if (name === 'preview') window.setTimeout(fitPreview, 30);
 }
 
-async function finishPdf(result) {
-    state.pdfBusy = true;
-    $('#badge-pages').textContent = 'PDF · montando...';
-    try {
-        const pdf = await generatePdf(result.resume);
-        state.pdf = pdf;
-        const pageLabel = pdf.pages === 1 ? 'PDF · 1 página' : `PDF · ${pdf.pages} páginas`;
-        $('#badge-pages').textContent = pageLabel;
-        $('#badge-pages').classList.toggle('badge-good', pdf.pages === 1);
-        $('#badge-pages').classList.toggle('badge-warn', pdf.pages > 1);
-        $('#download-pdf').disabled = false;
-        if (pdf.pages > 1) {
-            showToast('O conteúdo passou de uma página. Revise ou encurte o currículo-base.', 'error');
-        }
-    } catch (error) {
-        $('#badge-pages').textContent = 'PDF · erro';
-        $('#badge-pages').classList.add('badge-warn');
-        showToast(`Erro ao montar o PDF: ${error.message}`, 'error');
-    } finally {
-        state.pdfBusy = false;
-    }
+function normalizeAnalysis(raw) {
+    const analysis = raw && typeof raw === 'object' ? raw : {};
+    const list = (value, max = 20) =>
+        (Array.isArray(value) ? value : [])
+            .map((item) => String(item || '').replace(/\s+/g, ' ').trim())
+            .filter(Boolean)
+            .slice(0, max);
+
+    return {
+        score: Math.max(0, Math.min(100, Math.round(Number(analysis.score) || 0))),
+        jobTitle: String(analysis.jobTitle || 'Vaga analisada').trim(),
+        company: String(analysis.company || 'Empresa confidencial').trim(),
+        keywordsCovered: list(analysis.keywordsCovered, 24),
+        keywordsMissing: list(analysis.keywordsMissing, 14),
+        changes: list(analysis.changes, 8),
+        gaps: list(analysis.gaps, 8),
+    };
 }
 
-async function handleGenerate() {
+async function processDone(raw) {
+    const rawBody = extractBodyHtml(String(raw.html || '').trim());
+    if (!rawBody) throw new Error('A IA não retornou o conteúdo do currículo.');
+
+    const baseSanitized = restoreAssets(state.prepared.html, state.prepared.assets);
+    const restored = restoreAssets(
+        injectBodyHtml(state.prepared.html, rawBody),
+        state.prepared.assets
+    );
+
+    const design = validateDesign(baseSanitized, restored);
+    if (!design.ok) {
+        throw new Error(
+            `A IA alterou o design e a geração foi bloqueada. ${design.reason} Tente novamente.`
+        );
+    }
+
+    const withPageRule = ensurePageRule(restored);
+    const contactCheck = reviewContacts(baseSanitized, withPageRule);
+    const analysis = normalizeAnalysis(raw.analysis);
+    const coverLetter = String(raw.coverLetter || '').trim();
+    const selfReview = (Array.isArray(raw.selfReview) ? raw.selfReview : [])
+        .map((item) => String(item || '').trim())
+        .filter(Boolean)
+        .slice(0, 6);
+
+    setLoadingStep(3, 'Revisando e medindo a página...', 'Conferindo contatos, design e paginação.');
+    const fit = await measurePageFit(withPageRule);
+    const baseLength = textLength(baseSanitized);
+    const resultLength = textLength(withPageRule);
+    const lengthCheck = {
+        base: baseLength,
+        result: resultLength,
+        ok: resultLength <= baseLength * 1.12 + 80,
+    };
+
+    state.printHtml = withPageRule;
+    state.fit = fit;
+    state.identity = extractContactValues(baseSanitized);
+
+    const result = {
+        analysis,
+        coverLetter,
+        selfReview,
+        fit,
+        lengthCheck,
+        designPreserved: true,
+        contactCheck,
+        html: withPageRule,
+    };
+
+    if (fit.pages > 1 || fit.clipped || fit.overflowing) {
+        showToast('O currículo passou de uma página. Revise o texto antes de salvar o PDF.', 'error');
+    } else if (!lengthCheck.ok) {
+        showToast('A IA aumentou o volume de texto. Confira se nada foi cortado.', 'error');
+    }
+    renderResult(result);
+}
+
+async function handleGenerate({ answers = null, force = false } = {}) {
     if (state.busy) return;
 
     if (!state.base.html) {
@@ -572,54 +822,60 @@ async function handleGenerate() {
     }
 
     state.busy = true;
-    state.pdf = null;
+    state.questions = [];
     state.result = null;
+    state.printHtml = '';
     clearLoadingTimers();
     $('#generate-btn').disabled = true;
     $('#generate-spinner').classList.remove('hidden');
     $('#generate-icon').classList.add('hidden');
     $('#generate-label').textContent = 'Gerando...';
-    setLoading('Analisando a vaga...', 'Extraindo requisitos e palavras-chave.');
+    setLoading('Lendo o design e a vaga...', 'Extraindo requisitos sem alterar a estrutura.');
     setLoadingStep(0);
 
     loadingTimers.push(
         window.setTimeout(() => {
-            if (state.busy) setLoadingStep(1, 'Cruzando com seu histórico...', 'Reescrevendo sem inventar nada.');
+            if (state.busy) setLoadingStep(1, 'Cruzando com seu histórico...', 'Identificando dúvidas antes de assumir fatos.');
         }, 2200)
     );
     loadingTimers.push(
         window.setTimeout(() => {
-            if (state.busy) setLoadingStep(2, 'Montando o PDF...', 'Ajustando o layout para uma página A4.');
-        }, 6500)
+            if (state.busy) setLoadingStep(2, 'Adaptando os textos...', 'Mantendo CSS, classes e layout intactos.');
+        }, 7000)
     );
 
     try {
+        state.prepared = prepareBaseHtml(state.base.html);
         const raw = await generateWithAI({
-            html: state.base.html,
+            html: state.prepared.bodyHtml,
             pdfText: state.base.pdfText,
             job,
             url: $('#job-url').value.trim(),
+            answers,
+            forceDone: force,
             settings: state.settings,
         });
-        const result = mergeIdentity(normalizeResult(raw), extractIdentity(state.base.html));
-        if (!result.resume.summary && !result.resume.skills.length && !result.resume.experience.length) {
-            throw new Error('A IA retornou um currículo vazio. Tente novamente com a descrição completa da vaga.');
+
+        if (raw.status === 'questions' && !force) {
+            clearLoadingTimers();
+            const questions = normalizeQuestions(raw.questions);
+            if (questions.length) {
+                state.busy = false;
+                renderQuestions(questions);
+                return;
+            }
         }
+
+        if (raw.status === 'questions' && force) {
+            throw new Error('A IA insistiu em perguntar mesmo após as respostas. Tente novamente.');
+        }
+
         clearLoadingTimers();
-        setLoadingStep(3, 'Quase pronto', 'Organizando a prévia e o relatório.');
-        renderResult(result);
-        await finishPdf(result);
+        await processDone(raw);
     } catch (error) {
         clearLoadingTimers();
-        showEmptyState();
+        showEmptyState(error.message);
         showToast(error.message, 'error');
-        const fallbackTitle = $('#result-empty h3');
-        const fallbackText = $('#result-empty p');
-        if (fallbackTitle) fallbackTitle.textContent = 'Não foi possível gerar';
-        if (fallbackText) {
-            fallbackText.textContent =
-                error.message.length > 220 ? `${error.message.slice(0, 220)}...` : error.message;
-        }
     } finally {
         state.busy = false;
         $('#generate-btn').disabled = false;
@@ -629,7 +885,7 @@ async function handleGenerate() {
     }
 }
 
-/* ---------- Downloads ---------- */
+/* ---------- Downloads, carta e impressão ---------- */
 
 function downloadBlob(blob, filename) {
     const url = URL.createObjectURL(blob);
@@ -642,55 +898,89 @@ function downloadBlob(blob, filename) {
     window.setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
-async function handleDownloadPdf() {
+function baseFilename() {
+    const name = slugify(state.identity.name || 'curriculo');
+    const company = slugify(state.result?.analysis?.company || '');
+    return `curriculo-${name}${company ? `-${company}` : ''}`;
+}
+
+function handlePrintResume() {
     if (!state.result) return;
-    const button = $('#download-pdf');
-    if (!state.pdf) {
-        if (state.pdfBusy) {
-            showToast('O PDF ainda está sendo montado.');
-            return;
-        }
-        button.disabled = true;
-        button.textContent = 'Montando...';
-        await finishPdf(state.result);
-        button.textContent = 'Baixar PDF';
-    }
-    if (!state.pdf) return;
-    const company = slugify(state.result.analysis.company);
-    const name = slugify(state.result.resume.name);
-    const filename = `curriculo-${name}${company ? `-${company}` : ''}.pdf`;
-    downloadBlob(state.pdf.blob, filename);
-    showToast('PDF baixado.');
+    showToast('No diálogo, escolha “Salvar como PDF” e desative cabeçalhos/rodapés.');
+    printHtml(state.printHtml);
 }
 
 function handleOpenPreview() {
     if (!state.result) return;
-    const html = buildResumeHtml(state.result.resume, { standalone: true });
-    const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+    const url = URL.createObjectURL(new Blob([state.printHtml], { type: 'text/html;charset=utf-8' }));
     window.open(url, '_blank', 'noopener');
     window.setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 function handleDownloadHtml() {
     if (!state.result) return;
-    const html = buildResumeHtml(state.result.resume, { standalone: true });
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const company = slugify(state.result.analysis.company);
-    const name = slugify(state.result.resume.name);
-    downloadBlob(blob, `curriculo-${name}${company ? `-${company}` : ''}.html`);
+    const blob = new Blob([state.printHtml], { type: 'text/html;charset=utf-8' });
+    downloadBlob(blob, `${baseFilename()}.html`);
     showToast('HTML baixado.');
+}
+
+function letterText() {
+    return $('#letter-body').innerText.trim();
+}
+
+function fullLetterText() {
+    const identity = state.identity || { name: '', values: [] };
+    const date = $('#letter-date').textContent;
+    return `${identity.name}\n${identity.values.join(' · ')}\n${date}\n\n${letterText()}`;
+}
+
+async function handleCopyLetter() {
+    try {
+        await navigator.clipboard.writeText(fullLetterText());
+        showToast('Carta copiada.');
+    } catch {
+        showToast('Não foi possível copiar automaticamente.', 'error');
+    }
+}
+
+function handleDownloadLetter() {
+    if (!state.result) return;
+    downloadBlob(new Blob([fullLetterText()], { type: 'text/plain;charset=utf-8' }), `${baseFilename()}-carta.txt`);
+    showToast('Carta baixada em .txt.');
+}
+
+function handlePrintLetter() {
+    if (!state.result) return;
+    const identity = state.identity || { name: '', values: [] };
+    printHtml(buildLetterHtml(letterText(), identity));
+    showToast('No diálogo, escolha “Salvar como PDF”.');
 }
 
 /* ---------- Demonstração ---------- */
 
-function runDemo({ scroll = true } = {}) {
+async function runDemo({ scroll = true } = {}) {
     clearLoadingTimers();
     state.busy = false;
-    state.pdf = null;
-    const result = createDemoResult();
-    renderResult(result);
-    showToast('Demonstração com dados fictícios. A prévia e o PDF são reais.');
-    finishPdf(result);
+    state.questions = [];
+    state.result = null;
+    state.prepared = null;
+    const demo = createDemo();
+    state.identity = extractContactValues(demo.html);
+    setLoading('Montando a demonstração...', 'Design preservado, carta e revisão.');
+    const fit = await measurePageFit(demo.html);
+    state.printHtml = demo.html;
+    state.fit = fit;
+    renderResult({
+        analysis: demo.analysis,
+        coverLetter: demo.coverLetter,
+        selfReview: demo.selfReview,
+        fit,
+        lengthCheck: { ok: true },
+        designPreserved: true,
+        contactCheck: { missing: [] },
+        html: demo.html,
+    });
+    showToast('Demonstração com dados fictícios. A prévia, a carta e a impressão são reais.');
     if (scroll) $('#app').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -708,11 +998,15 @@ function bindEvents() {
         state.settings = { ...DEFAULT_SETTINGS };
         state.base = { html: '', htmlName: '', pdfText: '', pdfName: '' };
         state.result = null;
-        state.pdf = null;
+        state.questions = [];
+        state.printHtml = '';
         renderFiles();
         updateProviderUI();
         closeSettings();
         showEmptyState();
+        $('#result-empty h3').textContent = 'Sua prévia A4 aparece aqui';
+        $('#result-empty p').textContent =
+            'Depois da análise, você vê o currículo pronto, as palavras-chave cobertas e as lacunas reais.';
         showToast('Dados locais removidos.');
     });
 
@@ -769,14 +1063,21 @@ function bindEvents() {
         }
     });
     $('#job-text').addEventListener('input', updateJobCount);
-    $('#generate-btn').addEventListener('click', handleGenerate);
+    $('#generate-btn').addEventListener('click', () => handleGenerate());
     $('#demo-btn').addEventListener('click', () => runDemo());
+
+    $('#questions-submit').addEventListener('click', () => handleQuestionsSubmit(false));
+    $('#questions-skip').addEventListener('click', () => handleQuestionsSubmit(true));
 
     $$('.tab').forEach((tab) => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
 
-    $('#download-pdf').addEventListener('click', handleDownloadPdf);
+    $('#print-pdf').addEventListener('click', handlePrintResume);
     $('#open-preview').addEventListener('click', handleOpenPreview);
     $('#download-html').addEventListener('click', handleDownloadHtml);
+
+    $('#copy-letter').addEventListener('click', handleCopyLetter);
+    $('#download-letter').addEventListener('click', handleDownloadLetter);
+    $('#print-letter').addEventListener('click', handlePrintLetter);
 
     window.addEventListener('resize', fitPreview);
     window.addEventListener('scroll', () => {

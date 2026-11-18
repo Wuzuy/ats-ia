@@ -47,11 +47,11 @@
             <div class="hero-glow" aria-hidden="true"></div>
             <div class="wrap hero-grid">
                 <div class="hero-copy">
-                    <span class="eyebrow"><span class="live-dot"></span> ATS · IA · PDF</span>
-                    <h1>Seu currículo, <span>pronto para o ATS</span> de cada vaga.</h1>
+                    <span class="eyebrow"><span class="live-dot"></span> ATS · IA · DESIGN</span>
+                    <h1>Seu currículo, <span>adaptado sem perder o design.</span></h1>
                     <p class="hero-sub">
-                        Envie seu HTML e PDF, cole o link da vaga e receba um currículo de uma página com as
-                        palavras-chave certas — sem inventar experiências.
+                        Envie o HTML e o PDF, cole a vaga. A IA pergunta o que falta, preserva seu layout,
+                        escreve a carta e revisa a página antes de imprimir.
                     </p>
                     <div class="hero-actions">
                         <a href="#app" class="btn btn-primary btn-lg">
@@ -64,9 +64,9 @@
                         <button type="button" class="btn btn-outline btn-lg" id="demo-btn">Ver demonstração</button>
                     </div>
                     <ul class="trust-list">
-                        <li><span class="trust-check">✓</span> Chave só no navegador</li>
-                        <li><span class="trust-check">✓</span> PDF A4 de 1 página</li>
-                        <li><span class="trust-check">✓</span> Zero invenção</li>
+                        <li><span class="trust-check">✓</span> Design preservado</li>
+                        <li><span class="trust-check">✓</span> Perguntas antes de assumir</li>
+                        <li><span class="trust-check">✓</span> Carta + revisão</li>
                     </ul>
                 </div>
 
@@ -108,7 +108,7 @@
                             <div class="mock-line w75"></div>
                         </div>
                     </div>
-                    <div class="mock-float">PDF · 1 página</div>
+                    <div class="mock-float">Design + PDF</div>
                 </div>
             </div>
         </section>
@@ -129,7 +129,7 @@
                             <span class="step-num">01</span>
                             <div>
                                 <h3>Base do currículo</h3>
-                                <p>HTML obrigatório. O PDF opcional melhora a leitura do texto.</p>
+                                <p>O HTML guarda o design e os fatos. O PDF opcional melhora a leitura do texto.</p>
                             </div>
                         </div>
 
@@ -199,11 +199,11 @@
                                 <path d="M19 15l.9 2.6L22.5 18l-2.6.9L19 21.5l-.9-2.6L15.5 18l2.6-.4L19 15Z" />
                             </svg>
                         </button>
-                        <p class="hint">A IA recebe apenas o texto do currículo e da vaga. Nada é salvo em servidores nossos.</p>
+                        <p class="hint">A IA recebe o HTML e a vaga. Ela não altera CSS, classes ou estrutura: só o texto. Nada é salvo em servidores nossos.</p>
                     </div>
                 </aside>
 
-                <section class="panel result-panel" aria-label="Resultado">
+                <section class="panel result-panel" id="result-panel" aria-label="Resultado">
                     <div class="result-empty" id="result-empty">
                         <div class="empty-illustration" aria-hidden="true">
                             <div class="empty-sheet">
@@ -214,12 +214,12 @@
                             </div>
                             <span class="empty-spark">✦</span>
                         </div>
-                        <h3>Sua prévia A4 aparece aqui</h3>
-                        <p>Depois da análise, você vê o currículo pronto, as palavras-chave cobertas e as lacunas reais.</p>
+                        <h3>Sua prévia com o design original</h3>
+                        <p>Depois da análise, você vê o currículo no seu layout, a carta, a revisão e as lacunas reais.</p>
                         <ul class="empty-checks">
-                            <li>Prévia A4 no navegador</li>
-                            <li>Download em PDF e HTML</li>
-                            <li>Relatório de aderência</li>
+                            <li>CSS e estrutura intactos</li>
+                            <li>Carta de apresentação</li>
+                            <li>Revisão e impressão A4</li>
                         </ul>
                     </div>
 
@@ -228,9 +228,28 @@
                         <h3 id="loading-title">Analisando a vaga...</h3>
                         <p id="loading-sub">Extraindo requisitos e palavras-chave.</p>
                         <div class="loading-steps" id="loading-steps">
-                            <span class="loading-step active">Lendo currículo-base</span>
+                            <span class="loading-step active">Lendo currículo e design</span>
                             <span class="loading-step">Cruzando com a vaga</span>
-                            <span class="loading-step">Montando o PDF</span>
+                            <span class="loading-step">Adaptando os textos</span>
+                            <span class="loading-step">Revisando e medindo a página</span>
+                        </div>
+                    </div>
+
+                    <div class="result-questions hidden" id="result-questions">
+                        <span class="eyebrow">Antes de gerar</span>
+                        <h3 id="questions-title">Preciso confirmar alguns pontos</h3>
+                        <p class="questions-intro">
+                            A IA encontrou informações que mudariam o currículo. Responda só o que fizer sentido;
+                            nada é inventado sem a sua confirmação.
+                        </p>
+                        <div id="questions-list" class="questions-list"></div>
+                        <div class="questions-actions">
+                            <button type="button" class="btn btn-primary btn-sm" id="questions-submit">
+                                Gerar com respostas
+                            </button>
+                            <button type="button" class="btn btn-ghost btn-sm" id="questions-skip">
+                                Gerar sem responder
+                            </button>
                         </div>
                     </div>
 
@@ -245,8 +264,8 @@
                                 <p id="result-company">—</p>
                             </div>
                             <div class="result-actions">
-                                <button type="button" class="btn btn-primary btn-sm" id="download-pdf">
-                                    Baixar PDF
+                                <button type="button" class="btn btn-primary btn-sm" id="print-pdf">
+                                    Salvar PDF
                                 </button>
                                 <button type="button" class="btn btn-outline btn-sm" id="open-preview">Abrir</button>
                                 <button type="button" class="btn btn-outline btn-sm" id="download-html">HTML</button>
@@ -255,20 +274,49 @@
 
                         <div class="result-badges">
                             <span class="badge badge-good" id="badge-pages">PDF · 1 página</span>
+                            <span class="badge badge-good" id="badge-design">Design preservado</span>
                             <span class="badge" id="badge-keywords">0 palavras-chave</span>
                             <span class="badge badge-warn hidden" id="badge-warn">Revise as lacunas</span>
                         </div>
+
+                        <p class="print-note hidden" id="print-scale-note"></p>
 
                         <div class="tabs" role="tablist" aria-label="Resultado">
                             <button type="button" class="tab active" role="tab" aria-selected="true"
                                 data-tab="preview" aria-controls="tab-preview">Prévia do currículo</button>
                             <button type="button" class="tab" role="tab" aria-selected="false"
-                                data-tab="analysis" aria-controls="tab-analysis">Análise ATS</button>
+                                data-tab="letter" aria-controls="tab-letter">Carta</button>
+                            <button type="button" class="tab" role="tab" aria-selected="false"
+                                data-tab="analysis" aria-controls="tab-analysis">Análise e revisão</button>
                         </div>
 
                         <div id="tab-preview" role="tabpanel" class="tab-panel">
+                            <p class="print-help">
+                                Para preservar o design e o texto selecionável, “Salvar PDF” abre o diálogo de
+                                impressão. Escolha “Salvar como PDF” e desative cabeçalhos e rodapés.
+                            </p>
                             <div class="paper-wrap" id="paper-wrap">
                                 <iframe id="preview-frame" title="Prévia do currículo adaptado" sandbox=""></iframe>
+                            </div>
+                        </div>
+
+                        <div id="tab-letter" role="tabpanel" class="tab-panel hidden">
+                            <div class="letter-toolbar">
+                                <p>Revise e edite a carta antes de baixar. O texto é seu.</p>
+                                <div class="letter-actions">
+                                    <button type="button" class="btn btn-outline btn-sm" id="copy-letter">Copiar</button>
+                                    <button type="button" class="btn btn-outline btn-sm" id="download-letter">Baixar .txt</button>
+                                    <button type="button" class="btn btn-primary btn-sm" id="print-letter">Salvar PDF</button>
+                                </div>
+                            </div>
+                            <div class="letter-paper">
+                                <div class="letter-head" id="letter-head"></div>
+                                <div class="letter-contact" id="letter-contact"></div>
+                                <div class="letter-date" id="letter-date"></div>
+                                <div class="letter-body" id="letter-body" contenteditable="true"
+                                    spellcheck="true" role="textbox" aria-multiline="true"
+                                    aria-label="Carta de apresentação editável"></div>
+                                <p class="letter-empty hidden" id="letter-empty">A IA não retornou uma carta. Gere novamente.</p>
                             </div>
                         </div>
 
@@ -288,6 +336,10 @@
                                 <h4>O que mudou</h4>
                                 <ul class="changes-list" id="changes-list"></ul>
                             </div>
+                            <div class="analysis-card">
+                                <h4>Revisão</h4>
+                                <ul class="review-list" id="review-list"></ul>
+                            </div>
                             <div class="honesty-note">
                                 <strong>Compromisso de veracidade.</strong>
                                 A IA não cria experiências, empresas, datas ou métricas. Se algo não está no seu
@@ -304,21 +356,32 @@
                 <div class="section-head">
                     <div>
                         <span class="eyebrow">Como funciona</span>
-                        <h2>Simples para você, forte para o ATS</h2>
+                        <h2>Refinado para não estragar o que funciona</h2>
                     </div>
-                    <p>O texto continua selecionável no PDF. Nada de imagem disfarçada de currículo.</p>
+                    <p>Seu design, seu texto e seu histórico continuam reconhecíveis. A IA só ajusta o que a vaga pede.</p>
                 </div>
                 <div class="feature-grid">
                     <article class="feature-card">
                         <span class="feature-icon">
                             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
                                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
-                                <path d="M14 2v6h6M8 13h8M8 17h5" />
+                                <rect x="3" y="4" width="18" height="16" rx="2" />
+                                <path d="M3 9h18M8 14h3M8 17h6" />
                             </svg>
                         </span>
-                        <h3>Leitura fiel da base</h3>
-                        <p>Seu HTML é lido como fonte da verdade. O PDF entra como apoio para não perder nenhum detalhe.</p>
+                        <h3>Design intacto</h3>
+                        <p>CSS, classes, imagens e estrutura são validados. Se a IA mexer no layout, a geração é bloqueada.</p>
+                    </article>
+                    <article class="feature-card">
+                        <span class="feature-icon">
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+                                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M8 10h8M8 14h5" />
+                                <path d="M21 12a8 8 0 0 1-8 8H7l-4 2 1-4a9 9 0 1 1 17-6Z" />
+                            </svg>
+                        </span>
+                        <h3>Pergunta antes de supor</h3>
+                        <p>Se a vaga pede algo que o currículo não comprova, a IA pergunta em vez de inventar.</p>
                     </article>
                     <article class="feature-card">
                         <span class="feature-icon">
@@ -328,8 +391,8 @@
                                 <path d="m20 20-3.5-3.5M8 11h6M11 8v6" />
                             </svg>
                         </span>
-                        <h3>Análise da vaga</h3>
-                        <p>Requisitos, tecnologias e palavras-chave são cruzados com o que você realmente tem.</p>
+                        <h3>Leitura da vaga</h3>
+                        <p>Jina Reader e fallback por proxy extraem o texto da vaga. Dá para revisar e editar antes de gerar.</p>
                     </article>
                     <article class="feature-card">
                         <span class="feature-icon">
@@ -339,8 +402,8 @@
                                 <path d="M5 19h14" />
                             </svg>
                         </span>
-                        <h3>PDF pronto para enviar</h3>
-                        <p>Layout A4 de uma página, texto extraível e palavras-chave no lugar certo. Baixe e candidate-se.</p>
+                        <h3>Revisão + PDF</h3>
+                        <p>Checagem de contatos, uma página e autoavaliação da IA. O PDF sai pela impressão, com texto selecionável.</p>
                     </article>
                 </div>
             </div>
@@ -361,7 +424,7 @@
                 <ul class="privacy-list">
                     <li><strong>Arquivos</strong><span>processados localmente</span></li>
                     <li><strong>Chave</strong><span>somente neste navegador</span></li>
-                    <li><strong>PDF</strong><span>gerado no cliente</span></li>
+                    <li><strong>PDF</strong><span>impressão local</span></li>
                 </ul>
             </div>
         </section>
@@ -464,8 +527,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="https://cdn.jsdelivr.net/npm/pdfmake@0.2.10/build/pdfmake.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pdfmake@0.2.10/build/vfs_fonts.js"></script>
     <script type="module" src="js/app.js"></script>
 </body>
 </html>
