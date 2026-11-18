@@ -77,8 +77,9 @@ proxy/worker.js     proxy opcional para OpenCode Zen
 
 ## Limites conhecidos
 
-- A leitura automática de links depende do `api.allorigins.win`; alguns sites
-  bloqueiam proxy. Nesse caso, cole a descrição da vaga manualmente.
+- A leitura automática de links usa o Jina Reader e, como fallback, o
+  `api.allorigins.win`. Alguns sites bloqueiam proxies; nesse caso, cole a
+  descrição da vaga manualmente.
 - O PDF é gerado com pdfmake para manter texto extraível. Não é uma captura de
   tela do HTML: o layout é uma versão ATS, com a mesma informação.
 - PDFs digitalizados (imagem) não têm texto extraível; envie um PDF de texto ou
@@ -91,4 +92,5 @@ proxy/worker.js     proxy opcional para OpenCode Zen
 - Nenhum arquivo é enviado para servidores do projeto.
 - A chave fica no navegador e vai apenas ao provedor selecionado.
 - O HTML, o PDF e a vaga são enviados ao provedor de IA durante a geração.
+- Ao buscar um link de vaga, a URL passa pelo Jina Reader/allorigins.
 - Use **Limpar dados** nas configurações para apagar tudo do navegador.
