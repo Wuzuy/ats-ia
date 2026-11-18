@@ -402,11 +402,13 @@
                     </label>
                     <label class="field">
                         <span>Modelo</span>
-                        <select id="gemini-model">
-                            <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-                            <option value="gemini-2.5-pro">gemini-2.5-pro</option>
-                            <option value="gemini-2.0-flash">gemini-2.0-flash</option>
-                        </select>
+                        <input type="text" id="gemini-model" value="gemini-2.5-flash" list="gemini-models"
+                            autocomplete="off" spellcheck="false">
+                        <datalist id="gemini-models">
+                            <option value="gemini-2.5-flash"></option>
+                            <option value="gemini-2.5-pro"></option>
+                            <option value="gemini-2.0-flash"></option>
+                        </datalist>
                     </label>
                     <p class="field-help">
                         Crie uma chave gratuita no <a href="https://aistudio.google.com/apikey" target="_blank"
