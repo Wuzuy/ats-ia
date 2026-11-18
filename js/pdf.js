@@ -9,12 +9,13 @@ const MUTED = '#6b7a8c';
 const LINE = '#c8d0da';
 
 const LAYOUTS = [
-    { fs: 10.2, gap: 5.8, line: 1.2, margin: [38, 34, 38, 30] },
-    { fs: 9.8, gap: 5.2, line: 1.18, margin: [38, 32, 38, 28] },
-    { fs: 9.4, gap: 4.6, line: 1.16, margin: [36, 30, 36, 26] },
-    { fs: 9.0, gap: 4.0, line: 1.14, margin: [34, 28, 34, 24] },
-    { fs: 8.6, gap: 3.4, line: 1.12, margin: [32, 26, 32, 22] },
-    { fs: 8.2, gap: 2.8, line: 1.1, margin: [30, 24, 30, 20] },
+    { fs: 11.0, gap: 6.4, line: 1.22, margin: [40, 36, 40, 32] },
+    { fs: 10.6, gap: 5.8, line: 1.2, margin: [38, 34, 38, 30] },
+    { fs: 10.2, gap: 5.2, line: 1.18, margin: [38, 32, 38, 28] },
+    { fs: 9.8, gap: 4.6, line: 1.16, margin: [36, 30, 36, 26] },
+    { fs: 9.4, gap: 4.0, line: 1.14, margin: [34, 28, 34, 24] },
+    { fs: 9.0, gap: 3.4, line: 1.12, margin: [32, 26, 32, 22] },
+    { fs: 8.6, gap: 2.8, line: 1.1, margin: [30, 24, 30, 20] },
 ];
 
 function sectionTitle(text, layout) {
