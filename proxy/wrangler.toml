@@ -1,0 +1,7 @@
+name = "ats-ia-proxy"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+
+# Configure os secrets antes do deploy:
+#   npx wrangler secret put OPENCODE_API_KEY
+#   npx wrangler secret put APP_TOKEN

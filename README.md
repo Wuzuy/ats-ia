@@ -37,9 +37,8 @@ A API do OpenCode Zen não responde CORS para o navegador. Para usar a chave do
 OpenCode, publique o proxy incluso em `proxy/worker.js` em um Cloudflare Worker.
 
 ```bash
-npm create cloudflare@latest -- ats-ia-proxy
-# copie proxy/worker.js para src/index.js
-cd ats-ia-proxy
+cd proxy
+npx wrangler login
 npx wrangler secret put OPENCODE_API_KEY
 npx wrangler secret put APP_TOKEN
 npx wrangler deploy
