@@ -341,18 +341,38 @@ function htmlToText(html) {
         .trim();
 }
 
-async function fetchText(url) {
+async function fetchWithTimeout(url, timeoutMs = 35000) {
     const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 30000);
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
     try {
-        const response = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, {
-            signal: controller.signal,
-        });
+        const response = await fetch(url, { signal: controller.signal });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return await response.text();
     } finally {
         window.clearTimeout(timer);
     }
+}
+
+async function fetchJobContent(url) {
+    try {
+        const markdown = await fetchWithTimeout(`https://r.jina.ai/${url}`);
+        const cleaned = markdown
+            .replace(/^Title:[\s\S]{0,900}?Markdown Content:\s*/i, '')
+            .replace(/^\*\*Veja também:\*\*\s*/i, '')
+            .replace(/^(?:\s*[*\-]\s*\[[^\]]*\]\([^)]*\)\s*\n?)+/i, '')
+            .split(/\n\s*(?:Descobrir mais|Vagas mais Acessadas|Bolsa de Emprego)\b/i)[0]
+            .trim();
+        if (cleaned.length >= 220) return cleaned;
+    } catch {
+        /* tenta o próximo proxy */
+    }
+
+    const html = await fetchWithTimeout(
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+    );
+    const text = htmlToText(html);
+    if (text.length < 220) throw new Error('A página retornou pouco texto.');
+    return text;
 }
 
 async function handleFetchJob() {
@@ -372,9 +392,7 @@ async function handleFetchJob() {
     status.textContent = 'Lendo a página...';
 
     try {
-        const html = await fetchText(url);
-        const text = htmlToText(html);
-        if (text.length < 220) throw new Error('A página retornou pouco texto.');
+        const text = await fetchJobContent(url);
 
         $('#job-text').value = text.slice(0, 22000);
         updateJobCount();
