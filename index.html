@@ -147,6 +147,7 @@
                             <input type="file" id="file-input" accept=".html,.htm,.pdf,text/html,application/pdf" multiple hidden>
                         </div>
                         <div class="file-list" id="file-list"></div>
+                        <p class="hint">Imagens e fontes externas precisam estar embutidas no HTML (data URI ou &lt;style&gt;) para sair no PDF.</p>
 
                         <details class="manual">
                             <summary>Colar HTML manualmente</summary>
@@ -293,7 +294,8 @@
                         <div id="tab-preview" role="tabpanel" class="tab-panel">
                             <p class="print-help">
                                 Para preservar o design e o texto selecionável, “Salvar PDF” abre o diálogo de
-                                impressão. Escolha “Salvar como PDF” e desative cabeçalhos e rodapés.
+                                impressão. Escolha “Salvar como PDF” e desative cabeçalhos e rodapés. Se o diálogo
+                                não abrir, use “Abrir” e imprima a página.
                             </p>
                             <div class="paper-wrap" id="paper-wrap">
                                 <iframe id="preview-frame" title="Prévia do currículo adaptado" sandbox=""></iframe>

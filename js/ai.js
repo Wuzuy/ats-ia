@@ -12,9 +12,9 @@ MODO DE EDIÇÃO DO HTML
 3. Não adicione nem remova elementos. Se precisar de espaço, encurte o texto existente. Preserve tags internas como <b>, <strong>, <em> e <span>, alterando apenas o texto dentro delas.
 4. Não altere nome, e-mail, telefone, LinkedIn, GitHub, empresas, instituições, datas, cursos ou certificações. Só faça isso se o candidato confirmar explicitamente nas respostas.
 5. Pode reescrever resumo, objetivo, bullets, descrições de projetos e linhas de competências para destacar o que a vaga pede — desde que o fato já exista.
-6. Corrija erros óbvios de português ou digitação no texto (ex.: “Fundção” → “Fundação”), sem alterar nomes próprios, instituições, datas ou fatos.
+6. Corrija erros óbvios de português ou digitação em palavras comuns (ex.: “organizacão” → “organização”), sem alterar nomes próprios, instituições, datas ou fatos.
 7. Não invente tecnologias, experiências, métricas, cursos ou resultados. Se a vaga pede algo ausente, registre em "keywordsMissing" e "gaps".
-8. Mantenha o currículo em UMA página A4 e não aumente o volume total de texto: reescreva, encurte e reorganize, mas não acrescente frases novas. O layout é fixo e pode cortar o excesso.
+8. Mantenha o currículo em UMA página A4 e não aumente o volume total de texto: reescreva, encurte e destaque, mas não acrescente frases novas e não mude a ordem dos elementos. O layout é fixo e pode cortar o excesso.
 9. Preserve exatamente os placeholders de imagens (ex.: __ATS_ASSET_0__) no mesmo lugar.
 10. Retorne APENAS o conteúdo interno do <body>, sem <!DOCTYPE>, <html>, <head>, <style> ou <body>. O app reinsere o conteúdo no documento original.
 

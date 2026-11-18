@@ -736,14 +736,17 @@ function normalizeAnalysis(raw) {
             .filter(Boolean)
             .slice(0, max);
 
+    const scoreValue = Number(String(analysis.score ?? '').replace(/[^\d]/g, ''));
+    const unique = (values) => [...new Set(values)];
+
     return {
-        score: Math.max(0, Math.min(100, Math.round(Number(analysis.score) || 0))),
+        score: Math.max(0, Math.min(100, Math.round(Number.isFinite(scoreValue) ? scoreValue : 0))),
         jobTitle: String(analysis.jobTitle || 'Vaga analisada').trim(),
         company: String(analysis.company || 'Empresa confidencial').trim(),
-        keywordsCovered: list(analysis.keywordsCovered, 24),
-        keywordsMissing: list(analysis.keywordsMissing, 14),
-        changes: list(analysis.changes, 8),
-        gaps: list(analysis.gaps, 8),
+        keywordsCovered: unique(list(analysis.keywordsCovered, 24)),
+        keywordsMissing: unique(list(analysis.keywordsMissing, 14)),
+        changes: unique(list(analysis.changes, 8)),
+        gaps: unique(list(analysis.gaps, 8)),
     };
 }
 

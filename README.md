@@ -105,6 +105,8 @@ proxy/worker.js     proxy opcional para OpenCode Zen
   impressão do navegador.
 - PDFs digitalizados (imagem) não têm texto extraível; envie um PDF de texto ou
   o HTML.
+- Imagens e fontes externas precisam estar embutidas no HTML (data URI ou
+  `<style>`). Arquivos relativos ao HTML original não são enviados junto.
 - A validação de design exige que a IA preserve tags, classes e CSS. Se o modelo
   alterar a estrutura, a geração é bloqueada e pode ser tentada novamente.
 
