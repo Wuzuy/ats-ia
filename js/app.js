@@ -378,9 +378,24 @@ async function fetchWithTimeout(url, timeoutMs = 35000) {
     }
 }
 
+function isBlockedPage(text) {
+    return /Additional Verification Required|Just a moment\.\.\.|bot-detection-anonymous|Enable JavaScript and cookies|Cloudflare Errors/i.test(
+        String(text || '')
+    );
+}
+
+function isIndeedUrl(url) {
+    try {
+        return /(^|\.)indeed\.com$/i.test(new URL(url).hostname);
+    } catch {
+        return false;
+    }
+}
+
 async function fetchJobContent(url) {
     try {
         const markdown = await fetchWithTimeout(`https://r.jina.ai/${url}`);
+        if (isBlockedPage(markdown)) throw new Error('blocked');
         const cleaned = markdown
             .replace(/^Title:[\s\S]{0,900}?Markdown Content:\s*/i, '')
             .replace(/^\*\*Veja também:\*\*\s*/i, '')
@@ -395,6 +410,7 @@ async function fetchJobContent(url) {
     const html = await fetchWithTimeout(
         `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
     );
+    if (isBlockedPage(html)) throw new Error('blocked');
     const text = htmlToText(html);
     if (text.length < 220) throw new Error('A página retornou pouco texto.');
     return text;
@@ -424,7 +440,9 @@ async function handleFetchJob() {
         status.textContent = 'Descrição importada. Revise antes de gerar.';
     } catch (error) {
         status.className = 'error';
-        status.textContent = 'Não consegui ler o link. Cole a descrição manualmente.';
+        status.textContent = isIndeedUrl(url)
+            ? 'O Indeed bloqueia a leitura automática. Abra a vaga, copie a descrição e cole abaixo.'
+            : 'Não consegui ler o link. Cole a descrição manualmente.';
     } finally {
         button.disabled = false;
         button.textContent = 'Buscar';
@@ -434,6 +452,25 @@ async function handleFetchJob() {
 function updateJobCount() {
     const length = $('#job-text').value.trim().length;
     $('#job-count').textContent = `${length.toLocaleString('pt-BR')} caracteres`;
+}
+
+async function handlePasteJob() {
+    const status = $('#fetch-status');
+    try {
+        const text = await navigator.clipboard.readText();
+        if (!text.trim()) {
+            showToast('A área de transferência está vazia.', 'error');
+            return;
+        }
+        $('#job-text').value = text.slice(0, 22000);
+        updateJobCount();
+        status.className = 'ok';
+        status.textContent = 'Descrição colada. Revise antes de gerar.';
+    } catch {
+        status.className = 'error';
+        status.textContent = 'Use Ctrl+V no campo de descrição.';
+        $('#job-text').focus();
+    }
 }
 
 /* ---------- Estados do resultado ---------- */
@@ -1085,6 +1122,7 @@ function bindEvents() {
         }
     });
     $('#job-text').addEventListener('input', updateJobCount);
+    $('#paste-job').addEventListener('click', handlePasteJob);
     $('#generate-btn').addEventListener('click', () => handleGenerate());
     $('#demo-btn').addEventListener('click', () => runDemo());
 

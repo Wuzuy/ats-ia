@@ -941,6 +941,18 @@ select option {
     min-height: 150px;
 }
 
+.job-tools {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.job-tools span {
+    font-size: 0.67rem;
+    color: var(--muted-2);
+}
+
 .field-meta {
     display: flex;
     justify-content: space-between;

@@ -174,11 +174,15 @@
                         </div>
                         <textarea id="job-text" rows="7"
                             placeholder="Cole aqui a descrição da vaga, requisitos e palavras-chave..."></textarea>
+                        <div class="job-tools">
+                            <button type="button" class="btn btn-outline btn-sm" id="paste-job">Colar descrição</button>
+                            <span>Funciona com Ctrl+V também.</span>
+                        </div>
                         <div class="field-meta">
                             <span id="job-count">0 caracteres</span>
                             <span id="fetch-status" role="status"></span>
                         </div>
-                        <p class="hint">A busca do link usa um proxy público para contornar CORS. Se o site bloquear, cole a descrição.</p>
+                        <p class="hint">A busca usa um proxy público. O Indeed bloqueia leitura automática: abra a vaga, copie a descrição e cole no campo acima.</p>
                     </div>
 
                     <div class="step step-generate">
